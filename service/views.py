@@ -1,3 +1,7 @@
+from decimal import Decimal, InvalidOperation
+
+import requests
+from django.db import transaction
 from django.http import JsonResponse
 from django.views import View
 from SmartApi import SmartConnect
@@ -8,6 +12,8 @@ import json
 import yfinance as yf
 import http.client
 from django.conf import settings
+
+from service.models import StockData, FinancialMetric, FinancialData
 
 # Create an object of SmartConnect
 apikey = settings.API_KEY
@@ -95,7 +101,63 @@ def market_data(token):
     except Exception as e:
         print("Market API failed: {}".format(e))
         return None  # Return None if there is an error
-    
+
+
+def get_nifty_200_stocks():
+    url = "https://archives.nseindia.com/content/indices/ind_nifty200list.csv"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+    }
+
+    try:
+        # Fetch the CSV file from the URL
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Check that the request was successful
+
+        # Read the content of the file into a pandas DataFrame
+        from io import StringIO
+        data = StringIO(response.text)
+        df = pd.read_csv(data)
+
+        return df
+
+    except Exception as e:
+        print("Failed to retrieve or parse the data:", e)
+        return None
+
+def fetch_quarterly_data(ticker):
+    try:
+        ticker = f"{ticker}.NS"
+        stock = yf.Ticker(ticker)
+        financials = stock.quarterly_financials
+        market_cap = stock.info["marketCap"]
+        data = {
+        "Operating Income": financials.loc['Operating Income', :],
+        "Total Revenue": financials.loc["Total Revenue", :],
+        "Basic EPS":  financials.loc['Basic EPS', :],
+        "Market Cap": market_cap
+        }
+        return data
+    except Exception as err:
+        print(err)
+
+def fetch_annual_data(ticker):
+    try:
+        ticker = f"{ticker}.NS"
+        stock = yf.Ticker(ticker)
+        financials = stock.financials
+        market_cap = stock.info["marketCap"]
+        data = {
+        "Operating Income": financials.loc['Operating Income', :],
+        "Total Revenue": financials.loc["Total Revenue", :],
+        "Basic EPS":  financials.loc['Basic EPS', :],
+        "Market Cap": market_cap
+        }
+        return data
+    except Exception as err:
+        print(err)
+
+
 class HistoricalDataView(View):
     def get(self, request):
         # Authenticate and get tokens
@@ -234,3 +296,77 @@ class FundamentalView(View):
         
         return JsonResponse(stock_data, safe=False)
 
+class StocksDataView(View):
+    def get(self, request):
+        df = get_nifty_200_stocks()
+        if df is not None:
+            for index, row in df.iterrows():
+                stock, created = StockData.objects.update_or_create(
+                    isin_code=row['ISIN Code'],
+                    defaults={
+                        'company_name': row['Company Name'],
+                        'industry': row['Industry'],
+                        'symbol': row['Symbol'],
+                        'series': row['Series']
+                    }
+                )
+            return JsonResponse({'message': 'Stock data imported successfully'}, status=200)
+        else:
+            return JsonResponse({'error': 'Failed to fetch stock data'}, status=500)
+
+
+
+class FinancialDataView(View):
+    def get(self, request, period='annual'):
+        fetch_data = fetch_annual_data if period == 'annual' else fetch_quarterly_data
+        stocks = StockData.objects.all()
+
+        successful_updates = 0
+        with transaction.atomic():
+            for stock in stocks:
+                print(f"stock: {stock}")
+                data = fetch_data(stock.symbol)
+                if data:
+                    for metric_name, values in data.items():
+                        metric, _ = FinancialMetric.objects.get_or_create(metric_name=metric_name)
+
+                        if isinstance(values, pd.Series):
+
+                            if period == 'annual':
+                                limited_values = values.head(4)
+                            else:
+                                limited_values = values.head(5)
+
+                            for date, value in limited_values.items():
+                                try:
+                                    date = pd.to_datetime(date).date()
+                                    val = Decimal(value) if pd.notna(value) else None
+                                    financial_data, created = FinancialData.objects.update_or_create(
+                                        stock=stock,
+                                        metric=metric,
+                                        date=date,
+                                        period=period,
+                                        defaults={'value': val}
+                                    )
+
+                                    if created or (financial_data.value != val and pd.notna(value)):
+                                        successful_updates += 1
+                                except (InvalidOperation, TypeError):
+                                    print(f"Error converting value {value} for metric {metric_name}")
+                        else:
+                            date = pd.to_datetime('today').date()
+                            try:
+                                value = Decimal(values)
+                                financial_data, created = FinancialData.objects.update_or_create(
+                                    stock=stock,
+                                    metric=metric,
+                                    date=date,
+                                    period=period,
+                                    defaults={'value': value}
+                                )
+                                if created or financial_data.value != value:
+                                    successful_updates += 1
+                            except (InvalidOperation, TypeError):
+                                print(f"Error converting Market Cap value {values}")
+
+        return JsonResponse({'message': f'Financial data for {period} period imported or updated successfully, total updates: {successful_updates}'}, status=200)
