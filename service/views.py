@@ -125,37 +125,43 @@ def get_nifty_200_stocks():
         print("Failed to retrieve or parse the data:", e)
         return None
 
+
 def fetch_quarterly_data(ticker):
     try:
         ticker = f"{ticker}.NS"
         stock = yf.Ticker(ticker)
+
         financials = stock.quarterly_financials
         market_cap = stock.info["marketCap"]
-        data = {
-        "Operating Income": financials.loc['Operating Income', :],
-        "Total Revenue": financials.loc["Total Revenue", :],
-        "Basic EPS":  financials.loc['Basic EPS', :],
-        "Market Cap": market_cap
-        }
+
+        data = {"Market Cap": market_cap}
+
+        for index, row in financials.iterrows():
+            data[index] = row
+
         return data
+
     except Exception as err:
-        print(err)
+        print(f"Error fetching data: {err}")
+
 
 def fetch_annual_data(ticker):
     try:
         ticker = f"{ticker}.NS"
         stock = yf.Ticker(ticker)
+
         financials = stock.financials
         market_cap = stock.info["marketCap"]
-        data = {
-        "Operating Income": financials.loc['Operating Income', :],
-        "Total Revenue": financials.loc["Total Revenue", :],
-        "Basic EPS":  financials.loc['Basic EPS', :],
-        "Market Cap": market_cap
-        }
+
+        data = {"Market Cap": market_cap}
+
+        for index, row in financials.iterrows():
+            data[index] = row
+
         return data
+
     except Exception as err:
-        print(err)
+        print(f"Error fetching data: {err}")
 
 
 class HistoricalDataView(View):
