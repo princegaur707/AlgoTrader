@@ -7,19 +7,19 @@ from datetime import datetime, timedelta
 import json
 import yfinance as yf
 import http.client
-from django.conf import settings
+from service.constants import *
 
 # Create an object of SmartConnect
-apikey = settings.API_KEY
+apikey = API_KEY
 obj = SmartConnect(api_key=apikey)
 
 def login():
     """
     Function to login and return AUTH and FEED tokens.
     """
-    username = settings.USERNAME
-    pwd = settings.PWD
-    token = settings.TOKEN
+    username = APP_USER
+    pwd = PWD
+    token = TOKEN
     data = obj.generateSession(username, pwd, pyotp.TOTP(token).now())
     refreshToken = data['data']['refreshToken']
     auth_token = data['data']['jwtToken']
