@@ -52,8 +52,9 @@ class SmartAPILiveDataConsumer(AsyncWebsocketConsumer):
         mode = 2  # 2: Fetches quotes
 
         # Token list for indices
+        # nifty50: 99926000, sensex: 99919000, banknifty: 99926009, nifty midcap 100: 99926011
         token_list = [
-            {"exchangeType": 1, "tokens": ["99926000", "99919000", "99926009", "99926011"]},
+            {"exchangeType": 1, "tokens": ["99926000", "99926009", "99926011"]},
             {"exchangeType": 3, "tokens": ["99919000"]}
         ]
 
