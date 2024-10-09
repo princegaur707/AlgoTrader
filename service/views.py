@@ -10,6 +10,7 @@ import json
 import yfinance as yf
 import http.client
 from service.constants import *
+from service.utils import get_nifty_50_stocks
 
 # Create an object of SmartConnect
 apikey = API_KEY
@@ -60,12 +61,14 @@ def market_data(token):
     Function to fetch historical data and return it as a JSON string.
     """
     try:
+        nifty_50_df = get_nifty_50_stocks()
+        token_list = nifty_50_df['token'].tolist()
         conn = http.client.HTTPSConnection("apiconnect.angelone.in")
 
         payload = {
             "mode": "FULL",
             "exchangeTokens": {
-                "NSE": ['526', '694', '3351', '10940', '2885', '3506', '7229', '910', '1363', '1232', '11630', '20374', '157', '16675', '236', '5258', '10999', '25', '467', '1594', '3499', '11536', '2031', '16669', '2475', '547', '3045', '3787', '881', '13538', '4306', '5900', '1660', '17818', '317', '21808', '3456', '11723', '17963', '1394', '3432', '11532', '15083', '1922', '11483', '1348', '4963', '1333', '10604', '14977']
+                "NSE": token_list
             }
         }
 
