@@ -1,3 +1,5 @@
+import time
+
 from django.http import JsonResponse
 from django.views import View
 from SmartApi import SmartConnect
@@ -11,7 +13,7 @@ from service.constants import *
 
 # Create an object of SmartConnect
 apikey = API_KEY
-obj = SmartConnect(api_key=apikey)
+obj = SmartConnect(api_key=API_KEY)
 
 def login():
     """
@@ -234,3 +236,27 @@ class FundamentalView(View):
         
         return JsonResponse(stock_data, safe=False)
 
+
+class TopGainersLosersView(View):
+    def get(self, request):
+        auth_token, feed_token = login()
+
+        gainers_params = {
+            "datatype": "PercPriceGainers",
+            "expirytype": "NEAR"
+        }
+        gainers = obj.gainersLosers(gainers_params)
+        time.sleep(0.5)
+        losers_params = {
+            "datatype": "PercPriceLosers",
+            "expirytype": "NEAR"
+        }
+        losers = obj.gainersLosers(losers_params)
+
+        return JsonResponse({
+            "status": "success",
+            "data": {
+                "top_gainers": gainers['data'],
+                "top_losers": losers['data']
+            }
+        }, status=200)

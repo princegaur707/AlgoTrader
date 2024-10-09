@@ -16,13 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from service.views import HistoricalDataView, MarketDataView, FundamentalView
+from service.views import HistoricalDataView, MarketDataView, FundamentalView, TopGainersLosersView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('historical-data/', HistoricalDataView.as_view(), name='historical-data'),
     path('market-data/', MarketDataView.as_view(), name="market-data"),
-    path('fundamental-data/', FundamentalView.as_view(), name="fundamental-data")
+    path('fundamental-data/', FundamentalView.as_view(), name="fundamental-data"),
+    path('top-gainers-losers/', TopGainersLosersView.as_view(), name="top-gainers-losers")
 ]
-
-
