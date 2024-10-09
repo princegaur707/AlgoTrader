@@ -61,10 +61,12 @@ class AllNiftyFiftyConsumer(AsyncWebsocketConsumer):
                     stock_info = self.nifty_50_stocks[self.nifty_50_stocks['token'] == token].iloc[0]
                     name = stock_info['name']
                     symbol = stock_info['symbol']
+                    data_type = 'Stock'
                 else:
                     index_details = self.index_info.get(token, {})
                     name = index_details.get('name', 'Unknown')
                     symbol = index_details.get('symbol', 'Unknown')
+                    data_type = 'Index'
 
                 last_traded_price = message['last_traded_price'] / 100
                 closed_price = message['closed_price'] / 100
@@ -76,6 +78,7 @@ class AllNiftyFiftyConsumer(AsyncWebsocketConsumer):
                 change_percentage = (change / closed_price) * 100 if closed_price != 0 else 0
 
                 formatted_data = {
+                    'Type': data_type,
                     'Name': name,
                     'Symbol': symbol,
                     'LTP': f"{last_traded_price:.2f}",
