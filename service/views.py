@@ -10,11 +10,14 @@ import json
 import yfinance as yf
 import http.client
 from service.constants import *
-from service.utils import get_nifty_50_stocks
+from service.utils import get_nifty_50_stocks, get_nifty_200_stocks, calculate_magic_number_for_tickers
 
 # Create an object of SmartConnect
 apikey = API_KEY
 obj = SmartConnect(api_key=API_KEY)
+nifty_50_data = get_nifty_50_stocks()
+nifty_200 = get_nifty_200_stocks()
+
 
 def login():
     """
@@ -61,8 +64,7 @@ def market_data(token):
     Function to fetch historical data and return it as a JSON string.
     """
     try:
-        nifty_50_df = get_nifty_50_stocks()
-        token_list = nifty_50_df['token'].tolist()
+        token_list = nifty_50_data['token'].tolist()
         conn = http.client.HTTPSConnection("apiconnect.angelone.in")
 
         payload = {
@@ -106,14 +108,24 @@ class HistoricalDataView(View):
         # Authenticate and get tokens
         auth_token, feed_token = login()
 
-        # Calculate date range
+        action = request.GET.get('action')
+        if action == 'calculate_magic_number':
+            return self.magic_number_response(request)
+        else:
+            return self.historical_data_response(request)
+
+    def magic_number_response(self, request):
+        result = calculate_magic_number_for_tickers(nifty_200)
+        return JsonResponse(result, safe=False)
+
+    def historical_data_response(self, request):
         thirty_days_ago = datetime.now() - timedelta(days=900)
         from_date = thirty_days_ago.strftime("%Y-%m-%d %H:%M")
         to_date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         # Get parameters from request
         exchange = request.GET.get('exchange', 'NSE')  # Default is NSE
-        token = request.GET.get('token', 1333)         # Default is 1333
+        token = request.GET.get('token', 1333)  # Default is 1333
         timeperiod = request.GET.get('timeperiod', 'ONE_DAY')  # Default is ONE_MINUTE
 
         # Fetch historical data
@@ -240,26 +252,43 @@ class FundamentalView(View):
         return JsonResponse(stock_data, safe=False)
 
 
+# class TopGainersLosersView(View):
+#     def get(self, request):
+#         auth_token, feed_token = login()
+#
+#         gainers_params = {
+#             "datatype": "PercPriceGainers",
+#             "expirytype": "NEAR"
+#         }
+#         gainers = obj.gainersLosers(gainers_params)
+#         time.sleep(0.5)
+#         losers_params = {
+#             "datatype": "PercPriceLosers",
+#             "expirytype": "NEAR"
+#         }
+#         losers = obj.gainersLosers(losers_params)
+#
+#         return JsonResponse({
+#             "status": "success",
+#             "data": {
+#                 "top_gainers": gainers['data'],
+#                 "top_losers": losers['data']
+#             }
+#         }, status=200)
+
+
 class TopGainersLosersView(View):
     def get(self, request):
         auth_token, feed_token = login()
+        data = market_data(auth_token)
+        stocks = json.loads(data)['data']['fetched']
 
-        gainers_params = {
-            "datatype": "PercPriceGainers",
-            "expirytype": "NEAR"
-        }
-        gainers = obj.gainersLosers(gainers_params)
-        time.sleep(0.5)
-        losers_params = {
-            "datatype": "PercPriceLosers",
-            "expirytype": "NEAR"
-        }
-        losers = obj.gainersLosers(losers_params)
+        sorted_stocks = sorted(stocks, key=lambda x: x['percentChange'], reverse=True)
+
+        top_gainers = sorted_stocks[:20]
+        top_losers = sorted_stocks[-20:]
 
         return JsonResponse({
-            "status": "success",
-            "data": {
-                "top_gainers": gainers['data'],
-                "top_losers": losers['data']
-            }
-        }, status=200)
+                "top_gainers": top_gainers,
+                "top_losers": top_losers
+            }, status=200)
