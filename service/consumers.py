@@ -79,6 +79,7 @@ class AllNiftyFiftyConsumer(AsyncWebsocketConsumer):
 
                 formatted_data = {
                     'Type': data_type,
+                    'symbolToken': token,
                     'Name': name,
                     'Symbol': symbol,
                     'LTP': f"{last_traded_price:.2f}",
